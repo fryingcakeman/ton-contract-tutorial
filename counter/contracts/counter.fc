@@ -1,0 +1,58 @@
+#include "imports/stdlib.fc";
+
+(int, int) load_data() {
+    ;; 解析cell
+    slice ds = get_data().begin_parse();
+    ;; 读取32位整数
+    int counter = ds~load_uint(32);
+    ;; 读取32位整数
+    int id = ds~load_uint(32);
+    ;; 结束解析
+    ds.end_parse();
+
+    return (counter, id);
+}
+
+() save_data(int counter, int id) impure {
+    set_data( ;; 将给定cell设置为持久合约数据
+        begin_cell() ;; 构建cell
+            .store_uint(counter, 32) ;; 用32位整数存储counter
+            .store_uint(id, 32) ;; 用32位整数存储id
+            .end_cell() ;; 结束构建cell
+    );
+}
+
+;; 处理传入消息
+;; my_balance: 合约当前余额
+;; msg_value: 随消息一起收到的TON币数量
+;; in_msg_full: 消息本身，包括消息发送者的信息、消息标志和其他数据
+;; in_msg_body: 消息中合约要使用的负载
+;; msg_value和in_msg_body值可以从in_msg_full参数中提取，但为了方便起见，它们由receive_internal的单独参数表示
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; 忽略所有空消息
+        return ();
+    }
+
+    ;; in_msg_body的前32位是操作码
+    ;; 加载操作码
+    int op = in_msg_body~load_uint(32);
+    if (op == 1) {
+        (int counter, int id) = load_data();
+        save_data(counter + 1, id);
+        return ();
+    }
+
+    ;; 如果操作码未知则抛出错误
+    throw(0xffff);
+}
+
+int get_counter() method_id {
+    (int counter, _) = load_data();
+    return counter;
+}
+
+int get_id() method_id {
+    (_, int id) = load_data();
+    return id;
+}
+
